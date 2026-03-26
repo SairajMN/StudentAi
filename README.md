@@ -65,6 +65,7 @@ mindmap
 | 📧 **Email Drafts**    | Creates personalized emails        | Save time applying to jobs         |
 | 📚 **Interview Prep**  | Generates Q&A for interviews       | Practice before the real thing     |
 | 🎯 **Career Guidance** | AI advice for your career          | Get personalized tips              |
+| 💬 **AI Chatbot**      | 24/7 chat assistant via n8n        | Get instant help anytime           |
 
 ---
 
@@ -284,6 +285,7 @@ studentai/
     │   ├── QuizModal.tsx      # Interview prep
     │   ├── FileUpload.tsx     # Resume uploader
     │   ├── Navbar.tsx         # Navigation bar
+    │   ├── ChatBot.tsx        # AI chat assistant
     │   └── ui/                # shadcn components
     │
     ├── 📂 lib/                # Utilities
@@ -477,11 +479,13 @@ graph TD
     Dashboard --> FileUpload[FileUpload]
     Results --> EmailModal[EmailModal]
     Results --> QuizModal[QuizModal]
+    Router --> ChatBot[💬 ChatBot]
 
     style App fill:#61DAFB,color:black
     style Hero fill:#4CAF50,color:white
     style Dashboard fill:#2196F3,color:white
     style Results fill:#FF9800,color:white
+    style ChatBot fill:#9C27B0,color:white
 ```
 
 ### Key Components Explained:
@@ -494,6 +498,7 @@ graph TD
 | 📧 **EmailModal**  | `EmailModal.tsx`  | Compose & send emails                 |
 | 📚 **QuizModal**   | `QuizModal.tsx`   | Interview practice questions          |
 | 📄 **FileUpload**  | `FileUpload.tsx`  | Drag & drop resume upload             |
+| 💬 **ChatBot**     | `ChatBot.tsx`     | 24/7 AI chat assistant                |
 
 ---
 
@@ -553,7 +558,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - 🧠 **Open Router** - AI model access
 - ⚛️ **React Team** - Amazing framework
 - 🎬 **Framer Motion** - Smooth animations
-
 ---
 
 <div align="center">
