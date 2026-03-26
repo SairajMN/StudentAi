@@ -359,9 +359,13 @@ export async function searchJobsWithAI(
     const rawJobs = await fetchAdzunaJobs(role, location, 10);
 
     if (rawJobs.length === 0) {
+      // Return success with empty jobs array instead of error
+      // This allows the UI to handle the "no results" case gracefully
       return {
-        success: false,
-        error: "No jobs found for this search criteria",
+        success: true,
+        jobs: [],
+        aiCareerGuidance: `No jobs found for "${role}" in "${location}". Try broadening your search criteria, checking different locations, or exploring related roles.`,
+        totalMatched: 0,
       };
     }
 

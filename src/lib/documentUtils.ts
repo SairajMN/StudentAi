@@ -31,8 +31,11 @@ export async function parsePDF(file: File): Promise<ParsedDocument> {
         // Dynamic import to avoid issues with SSR
         const pdfjsLib = await import("pdfjs-dist");
 
-        // Set worker source
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+        // Configure worker for Vite - use inline worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+          "pdfjs-dist/build/pdf.worker.mjs",
+          import.meta.url,
+        ).toString();
 
         const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
         let fullText = "";
@@ -41,7 +44,7 @@ export async function parsePDF(file: File): Promise<ParsedDocument> {
           const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
           const pageText = textContent.items
-            .map((item: any) => item.str)
+            .map((item) => ("str" in item ? item.str : ""))
             .join(" ");
           fullText += pageText + "\n";
         }
