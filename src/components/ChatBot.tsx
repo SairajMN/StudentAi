@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const N8N_WEBHOOK_URL = "/api/chat";
-gi
+
 interface Message {
   id: string;
   role: "user" | "assistant";
