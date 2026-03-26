@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const N8N_WEBHOOK_URL =
-  "/api/n8n/webhook-test/3cc4a03a-315f-4608-8dc2-729208515354";
+  "/api/n8n/webhook/e73ca48e-e2da-4724-8484-917e902af575/chat";
 
 interface Message {
   id: string;
