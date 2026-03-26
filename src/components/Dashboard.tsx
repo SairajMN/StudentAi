@@ -12,12 +12,13 @@ import {
   User,
   Mail,
   Sparkles,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import FileUpload from "@/components/FileUpload";
-import { runPlacementAgent, JobMatch } from "@/lib/api";
+import { searchJobsWithAI, JobMatch, CS_JOB_ROLES } from "@/lib/api";
 
 const PIPELINE_STEPS = [
   { id: "fetch", label: "Fetch Jobs", icon: "🔍" },
@@ -43,7 +44,7 @@ const Dashboard = ({ onComplete }: DashboardProps) => {
   const [currentStep, setCurrentStep] = useState(-1);
 
   const handleStart = async () => {
-    if (!name.trim() || !email.trim() || !targetRole.trim()) return;
+    if (!targetRole.trim()) return;
     setRunning(true);
     setCurrentStep(0);
 
@@ -62,14 +63,17 @@ const Dashboard = ({ onComplete }: DashboardProps) => {
         .map((s) => s.trim())
         .filter(Boolean);
 
-      const response = await runPlacementAgent({
-        name: name.trim(),
-        email: email.trim(),
-        skills: skillsArray,
-        targetRole: targetRole.trim(),
-        location: location.trim(),
-        resume: resume.trim(),
-      });
+      // Use default skills if none provided
+      const defaultSkills =
+        skillsArray.length > 0
+          ? skillsArray
+          : ["JavaScript", "React", "Node.js"];
+
+      const response = await searchJobsWithAI(
+        targetRole.trim(),
+        location.trim() || "India",
+        defaultSkills,
+      );
 
       clearInterval(stepInterval);
 
@@ -82,13 +86,13 @@ const Dashboard = ({ onComplete }: DashboardProps) => {
       } else {
         setCurrentStep(-1);
         setRunning(false);
-        console.error("Placement agent failed:", response.error);
+        console.error("Job search failed:", response.error);
       }
     } catch (error) {
       clearInterval(stepInterval);
       setCurrentStep(-1);
       setRunning(false);
-      console.error("Error calling placement agent:", error);
+      console.error("Error calling job search:", error);
     }
   };
 
@@ -181,12 +185,30 @@ const Dashboard = ({ onComplete }: DashboardProps) => {
               <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
                 <Briefcase className="w-4 h-4 text-secondary" /> Target Role
               </label>
-              <Input
-                placeholder="e.g. Frontend Developer"
-                className="bg-muted/30 border-glass-border focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50"
-                value={targetRole}
-                onChange={(e) => setTargetRole(e.target.value)}
-              />
+              <div className="relative">
+                <select
+                  className="w-full h-10 px-3 py-2 bg-muted/30 border border-glass-border rounded-md text-foreground appearance-none cursor-pointer focus:border-primary/50 focus:outline-none"
+                  value={targetRole}
+                  onChange={(e) => setTargetRole(e.target.value)}
+                >
+                  <option
+                    value=""
+                    className="bg-background text-muted-foreground"
+                  >
+                    Select a CS role...
+                  </option>
+                  {CS_JOB_ROLES.map((role) => (
+                    <option
+                      key={role}
+                      value={role}
+                      className="bg-background text-foreground"
+                    >
+                      {role}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              </div>
             </div>
 
             <div>
@@ -203,9 +225,7 @@ const Dashboard = ({ onComplete }: DashboardProps) => {
 
             <Button
               onClick={handleStart}
-              disabled={
-                running || !name.trim() || !email.trim() || !targetRole.trim()
-              }
+              disabled={running || !targetRole.trim()}
               className="w-full py-6 text-lg font-heading font-semibold bg-primary hover:bg-primary/90 text-primary-foreground neon-glow disabled:opacity-40"
             >
               {running ? (
