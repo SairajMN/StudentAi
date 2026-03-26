@@ -5,20 +5,35 @@ import HeroSection from "@/components/HeroSection";
 import Dashboard from "@/components/Dashboard";
 import JobResults from "@/components/JobResults";
 import ActivityLog from "@/components/ActivityLog";
+import { JobMatch } from "@/lib/api";
 
 const views = ["hero", "dashboard", "results", "activity"] as const;
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<string>("hero");
+  const [jobResults, setJobResults] = useState<JobMatch[] | undefined>();
+  const [aiGuidance, setAiGuidance] = useState<string | undefined>();
+
+  const handleDashboardComplete = (jobs?: JobMatch[], guidance?: string) => {
+    setJobResults(jobs);
+    setAiGuidance(guidance);
+    setCurrentView("results");
+  };
 
   const renderView = () => {
     switch (currentView) {
       case "hero":
         return <HeroSection onStart={() => setCurrentView("dashboard")} />;
       case "dashboard":
-        return <Dashboard onComplete={() => setCurrentView("results")} />;
+        return <Dashboard onComplete={handleDashboardComplete} />;
       case "results":
-        return <JobResults onStartQuiz={() => {}} />;
+        return (
+          <JobResults
+            jobs={jobResults}
+            aiGuidance={aiGuidance}
+            onStartQuiz={() => {}}
+          />
+        );
       case "activity":
         return <ActivityLog />;
       default:
