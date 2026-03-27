@@ -1,0 +1,352 @@
+{
+  "name": "Placement Agent Optimized",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "placement-agent",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "3507eaec-a78b-4961-95b2-e43099edaa6d",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -928,
+        176
+      ],
+      "webhookId": "c178682d-c3d5-45f0-9014-57c6a556f71b"
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.ADZUNA_BASE_URL || 'https://api.adzuna.com/v1/api/jobs/in/search/1' }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "app_id",
+              "value": "={{ $env.ADZUNA_APP_ID }}"
+            },
+            {
+              "name": "app_key",
+              "value": "={{ $env.ADZUNA_APP_KEY }}"
+            },
+            {
+              "name": "results_per_page",
+              "value": "={{ $node['Webhook Trigger'].json.body.resultsPerPage || 10 }}"
+            },
+            {
+              "name": "what",
+              "value": "={{ $node['Webhook Trigger'].json.body.keyword || $node['Webhook Trigger'].json.body.targetRole || 'software developer' }}"
+            },
+            {
+              "name": "where",
+              "value": "={{ $node['Webhook Trigger'].json.body.location || 'Bangalore' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6bc715ef-997a-4942-9772-b55ab58f40e2",
+      "name": "Fetch Jobs from Adzuna",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -704,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $node['Webhook Trigger'].json.body || {};\nconst response = $input.first()?.json || {};\nconst results = Array.isArray(response.results) ? response.results : [];\n\nconst candidateSkills = Array.isArray(body.skills)\n  ? body.skills\n  : typeof body.skills === 'string'\n  ? body.skills.split(',').map(s => s.trim()).filter(Boolean)\n  : [];\n\nconst base = {\n  candidateName: body.name || body.studentName || body.fullName || 'Candidate',\n  candidateEmail: body.email || body.studentEmail || '',\n  candidateSkills,\n  targetRole: body.keyword || body.targetRole || body.role || 'software developer',\n  location: body.location || body.city || 'Bangalore',\n  resumeLink: body.resumeLink || body.resume || '',\n  minScore: Number(body.minScore ?? 5)\n};\n\nif (results.length === 0) {\n  return [\n    {\n      json: {\n        ...base,\n        noJobsFound: true\n      }\n    }\n  ];\n}\n\nreturn results.map(job => {\n  return {\n    json: {\n      ...base,\n      noJobsFound: false,\n      jobTitle: job.title || 'Unknown Role',\n      company: job.company?.display_name || 'Unknown Company',\n      jobLocation: job.location?.display_name || base.location,\n      jobDescription: job.description || '',\n      applyUrl: job.redirect_url || '',\n      salaryMin: job.salary_min ?? null,\n      salaryMax: job.salary_max ?? null,\n      publishedAt: job.created || job.created_at || '',\n      source: 'Adzuna'\n    }\n  };\n});"
+      },
+      "id": "a209bb64-6d31-4e69-9fcf-2eaf137571f9",
+      "name": "Normalize Jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.noJobsFound === true }}",
+              "operation": "isTrue"
+            }
+          ]
+        }
+      },
+      "id": "9f00c72e-9bf4-4b90-a4da-e4ca111ddc47",
+      "name": "Check No Jobs Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -256,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.OPENROUTER_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "HTTP-Referer",
+              "value": "https://n8n.io"
+            },
+            {
+              "name": "X-Title",
+              "value": "Placement Agent"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"model\": \"nvidia/nemotron-4-340b-instruct\",\n  \"temperature\": 0.2,\n  \"max_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a strict job relevance scorer. Return only valid JSON. No markdown.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Candidate name: {{$node['Webhook Trigger'].json.body.name || $node['Webhook Trigger'].json.body.studentName || 'Candidate'}}\\nCandidate skills: {{ Array.isArray($json.candidateSkills) ? $json.candidateSkills.join(', ') : '' }}\\nTarget role: {{$json.targetRole}}\\nLocation preference: {{$json.location}}\\n\\nJob title: {{$json.jobTitle}}\\nCompany: {{$json.company}}\\nJob location: {{$json.jobLocation}}\\nJob description: {{$json.jobDescription}}\\nApply URL: {{$json.applyUrl}}\\n\\nScore this job from 0 to 10 based on fit between the candidate and the job. Return JSON exactly in this format: {\\\"score\\\": 0-10, \\\"reason\\\": \\\"short reason\\\", \\\"skills_needed\\\": [\\\"skill1\\\", \\\"skill2\\\"]}.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "07624c55-313d-4b5a-bf79-c9acb29fc51a",
+      "name": "Nemotron Score Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -32,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "HTTP-Referer",
+              "value": "https://n8n.io"
+            },
+            {
+              "name": "X-Title",
+              "value": "Placement Agent"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"model\": \"nvidia/nemotron-4-340b-instruct\",\n  \"temperature\": 0.7,\n  \"max_tokens\": 2048,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an AI Placement Agent specializing in career guidance and job matching. You analyze candidate profiles, provide personalized recommendations, identify skill gaps, and suggest career development paths. Be helpful, encouraging, and provide actionable advice.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Analyze this candidate profile and provide comprehensive career guidance:\\n\\nCandidate: {{$node['Webhook Trigger'].json.body.name || $node['Webhook Trigger'].json.body.studentName || 'Candidate'}}\\nCurrent Skills: {{ Array.isArray($node['Normalize Jobs'].json.candidateSkills) ? $node['Normalize Jobs'].json.candidateSkills.join(', ') : 'Not specified' }}\\nTarget Role: {{$node['Normalize Jobs'].json.targetRole}}\\nLocation: {{$node['Normalize Jobs'].json.location}}\\n\\nTop Matching Jobs Found:\\n{{ $json.jobs.slice(0, 3).map(j => '- ' + j.jobTitle + ' at ' + j.company + ' (Score: ' + j.score + '/10)').join('\\\\n') }}\\n\\nProvide:\\n1. Career Assessment: Brief evaluation of candidate's profile strength\\n2. Skill Gap Analysis: Key skills missing for target role\\n3. Recommended Learning Path: Top 3 skills to develop\\n4. Application Strategy: Tips for applying to matched jobs\\n5. Interview Preparation: Key areas to focus on\\n\\nKeep response concise and actionable.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "777e5faf-99c7-4456-8f59-f4f5ca84a025",
+      "name": "AI Career Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        400,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const scoredItems = $input.all();\nconst originalJobs = $items('Normalize Jobs');\nconst body = $node['Webhook Trigger'].json.body || {};\nconst threshold = Number(body.minScore ?? 5);\nconst matches = [];\n\nfunction extractContent(raw) {\n  return raw?.choices?.[0]?.message?.content\n    ?? raw?.data?.choices?.[0]?.message?.content\n    ?? raw?.response?.choices?.[0]?.message?.content\n    ?? '';\n}\n\nfunction parseModelJson(content) {\n  try {\n    const cleaned = String(content || '')\n      .replace(/json/gi, '')\n      .replace(/```/g, '')\n      .trim();\n\n    const match = cleaned.match(/\\{[\\s\\S]*\\}/);\n    const candidate = match ? match[0] : cleaned;\n    return JSON.parse(candidate);\n  } catch (e) {\n    return {\n      score: 0,\n      reason: 'Could not parse model response',\n      skills_needed: []\n    };\n  }\n}\n\nfor (let i = 0; i < scoredItems.length; i++) {\n  const raw = scoredItems[i].json || {};\n  const job = originalJobs[i]?.json || {};\n  const parsed = parseModelJson(extractContent(raw));\n  const score = Math.max(0, Math.min(10, Number(parsed.score) || 0));\n\n  if (score < threshold) continue;\n\n  const candidateName = job.candidateName || 'Candidate';\n  const candidateSkills = Array.isArray(job.candidateSkills) ? job.candidateSkills : [];\n  const resumeLink = job.resumeLink || '';\n\n  const emailSubject = `Application for ${job.jobTitle} at ${job.company}`;\n  const emailDraft = [\n    `Subject: ${emailSubject}`,\n    '',\n    `Hello ${job.company} Hiring Team,`,\n    '',\n    `I am interested in the ${job.jobTitle} role. My background and skills align with this opportunity.`,\n    '',\n    `Relevant skills: ${candidateSkills.length ? candidateSkills.join(', ') : 'Not provided'}`,\n    `Match reason: ${parsed.reason || 'Strong relevance'}`,\n    `Suggested skills to highlight: ${(Array.isArray(parsed.skills_needed) && parsed.skills_needed.length) ? parsed.skills_needed.join(', ') : 'None'}`,\n    '',\n    `Resume: ${resumeLink || 'Not provided'}`,\n    `Apply link: ${job.applyUrl || 'Not provided'}`,\n    '',\n    'Best regards,',\n    candidateName\n  ].join('\\n');\n\n  matches.push({\n    candidateName,\n    candidateEmail: job.candidateEmail || '',\n    candidateSkills,\n    targetRole: job.targetRole,\n    location: job.location,\n    jobTitle: job.jobTitle,\n    company: job.company,\n    jobLocation: job.jobLocation,\n    jobDescription: job.jobDescription,\n    applyUrl: job.applyUrl,\n    salaryMin: job.salaryMin,\n    salaryMax: job.salaryMax,\n    publishedAt: job.publishedAt,\n    source: job.source,\n    score,\n    reason: parsed.reason || '',\n    skills_needed: Array.isArray(parsed.skills_needed) ? parsed.skills_needed : [],\n    emailSubject,\n    emailDraft\n  });\n}\n\nmatches.sort((a, b) => b.score - a.score);\n\nreturn [\n  {\n    json: {\n      status: 'success',\n      totalScored: scoredItems.length,\n      totalMatched: matches.length,\n      threshold,\n      jobs: matches.slice(0, 10),\n      timestamp: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "id": "44b19799-3df5-4d99-9c77-b6c8ba1af9e9",
+      "name": "Aggregate And Build Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $node['Webhook Trigger'].json.body || {};\n\nreturn [\n  {\n    json: {\n      status: 'success',\n      totalScored: 0,\n      totalMatched: 0,\n      threshold: Number(body.minScore ?? 5),\n      jobs: [],\n      message: 'No jobs found for the given query.',\n      timestamp: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "id": "7a881b78-1946-496e-9774-84d27dcf551e",
+      "name": "Build No Jobs Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const aggregateResult = $items('Aggregate And Build Response')[0]?.json || {};\nconst aiGuidance = $items('AI Career Agent')[0]?.json || {};\n\nfunction extractContent(raw) {\n  return raw?.choices?.[0]?.message?.content\n    ?? raw?.data?.choices?.[0]?.message?.content\n    ?? raw?.response?.choices?.[0]?.message?.content\n    ?? '';\n}\n\nconst careerGuidance = extractContent(aiGuidance);\n\nreturn [\n  {\n    json: {\n      ...aggregateResult,\n      aiCareerGuidance: careerGuidance || 'Career guidance not available'\n    }\n  }\n];"
+      },
+      "id": "cc8c3c82-8451-4ec2-92f0-c5701d8c58da",
+      "name": "Merge AI Guidance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "options": {}
+      },
+      "id": "9a6eb701-0592-4796-8933-46c27852eec7",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        864,
+        176
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Jobs from Adzuna",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Jobs from Adzuna": {
+      "main": [
+        [
+          {
+            "node": "Normalize Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Jobs": {
+      "main": [
+        [
+          {
+            "node": "Check No Jobs Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check No Jobs Found": {
+      "main": [
+        [
+          {
+            "node": "Build No Jobs Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nemotron Score Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build No Jobs Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nemotron Score Job": {
+      "main": [
+        [
+          {
+            "node": "Aggregate And Build Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate And Build Response": {
+      "main": [
+        [
+          {
+            "node": "AI Career Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge AI Guidance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Career Agent": {
+      "main": [
+        [
+          {
+            "node": "Merge AI Guidance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge AI Guidance": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "ac448e56-19ec-412c-bed6-ce2b5e4ad1f0",
+  "meta": {
+    "instanceId": "509a2c7de06117a645c3467aaa1c9223c2cb04df1c25e6237464220eb19c76d4"
+  },
+  "id": "WIZTBklqlkU2c20n",
+  "tags": []
+}

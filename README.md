@@ -118,6 +118,49 @@ flowchart TD
 
 ## 🏗️ Architecture
 
+### n8n Workflow Diagram
+
+The Placement Agent uses an n8n workflow for backend automation. Here's the complete workflow:
+
+```mermaid
+flowchart TD
+    WH[🔔 Webhook Trigger<br/>POST /placement-agent] --> FJ[🔍 Fetch Jobs from Adzuna<br/>HTTP Request]
+    FJ --> NJ[📝 Normalize Jobs<br/>Code Node]
+    NJ --> CNF{✅ Check No Jobs Found<br/>IF Node}
+
+    CNF -->|True - No Jobs| BNJ[📭 Build No Jobs Response<br/>Code Node]
+    CNF -->|False - Jobs Found| NSJ[🧠 Nemotron Score Job<br/>OpenRouter AI]
+
+    BNJ --> RWH[📤 Respond to Webhook]
+
+    NSJ --> ABR[📊 Aggregate And Build Response<br/>Code Node]
+    ABR --> ACG[🎯 AI Career Agent<br/>OpenRouter AI]
+    ABR --> MAG[🔗 Merge AI Guidance<br/>Code Node]
+    ACG --> MAG
+    MAG --> RWH
+
+    style WH fill:#4CAF50,color:white
+    style FJ fill:#FF6B00,color:white
+    style CNF fill:#FF9800,color:white
+    style NSJ fill:#9C27B0,color:white
+    style ACG fill:#9C27B0,color:white
+    style RWH fill:#2196F3,color:white
+```
+
+### Workflow Steps Explained
+
+| Step | Node                             | Description                                                               |
+| ---- | -------------------------------- | ------------------------------------------------------------------------- |
+| 1️⃣   | **Webhook Trigger**              | Receives POST requests with candidate data (name, skills, role, location) |
+| 2️⃣   | **Fetch Jobs from Adzuna**       | Calls Adzuna API to search for matching jobs                              |
+| 3️⃣   | **Normalize Jobs**               | Transforms raw API data into standardized format                          |
+| 4️⃣   | **Check No Jobs Found**          | Branches based on whether jobs were found                                 |
+| 5️⃣   | **Nemotron Score Job**           | Uses NVIDIA Nemotron AI to score each job (0-10)                          |
+| 6️⃣   | **Aggregate And Build Response** | Filters jobs by score threshold, builds email drafts                      |
+| 7️⃣   | **AI Career Agent**              | Generates personalized career guidance                                    |
+| 8️⃣   | **Merge AI Guidance**            | Combines job results with AI career advice                                |
+| 9️⃣   | **Respond to Webhook**           | Returns final JSON response to the frontend                               |
+
 ### System Architecture Diagram
 
 ```mermaid
@@ -558,6 +601,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - 🧠 **Open Router** - AI model access
 - ⚛️ **React Team** - Amazing framework
 - 🎬 **Framer Motion** - Smooth animations
+
 ---
 
 <div align="center">
