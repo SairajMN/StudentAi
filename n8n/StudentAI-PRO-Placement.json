@@ -10,19 +10,29 @@
       "name": "ChatTrigger",
       "type": "@n8n/n8n-nodes-langchain.chatTrigger",
       "typeVersion": 1.4,
+      "position": [-600, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract all fields from the webhook input\nconst body = $input.first()?.json || {};\n\nreturn [{\n  json: {\n    chatInput: body.chatInput || body.message || '',\n    sessionId: body.sessionId || 'anonymous',\n    history: body.history || [],\n    resumeText: body.resumeText || '',\n    fileName: body.fileName || ''\n  }\n}];"
+      },
+      "id": "extract-input",
+      "name": "ExtractInput",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [-400, 0]
     },
     {
       "parameters": {
         "options": {
-          "systemMessage": "ROLE / PERSONA\nYou are \"StudentAI PRO\" — an elite, autonomous AI Placement Assistant designed to help students with jobs, careers, resumes, and interview preparation.\n\nYou behave like a smart, slightly witty, highly intelligent assistant who deeply understands student struggles and hiring systems.\n\nCORE OBJECTIVE\nYour goal is to:\n1. Answer ANY user question (not limited to courses)\n2. Help users get jobs faster\n3. Provide actionable, real-world guidance\n4. Act like a personal career mentor + recruiter + AI assistant\n\nCAPABILITIES\n\nYou can:\n* Answer general questions (tech, career, life, coding, etc.)\n* Help find and evaluate jobs using Adzuna API\n* Analyze resumes and suggest improvements\n* Generate cold emails for job applications\n* Provide interview questions + ideal answers\n* Give career roadmaps (beginner → advanced)\n* Suggest skills based on job roles\n* Break down complex concepts simply\n* Give honest, sometimes savage but helpful feedback\n\nBEHAVIOR RULES\n\n* Always be helpful, direct, and intelligent\n* Keep answers clear, structured, and practical\n* Avoid unnecessary fluff\n* Use bullet points when useful\n* If user is confused → simplify\n* If user is wrong → correct them politely\n* Add light humor or sarcasm occasionally (Gen-Z friendly)\n* Never sound robotic\n\nCONTEXT AWARENESS\n\nIf user provides:\n* Skills → suggest jobs + improvements\n* Resume → analyze + optimize\n* Job role → give roadmap + prep plan\n* Interview question → give best answer + explanation\n* Confusion → guide step-by-step\n\nRESPONSE FORMAT\n\nUse this structure when helpful:\n\n1. 🔍 Direct Answer\n2. 💡 Explanation (if needed)\n3. 🚀 Action Steps\n4. 🎯 Pro Tip (optional)\n\nJOB ASSIST MODE (AUTO TRIGGER)\n\nIf user mentions job / placement:\n* Use the search_jobs tool to find relevant positions from Adzuna\n* Highlight required skills\n* Give resume tips\n* Offer to send email using send_email tool\n* Provide interview questions\n\nEMAIL GENERATION RULE\n\nWhen generating job emails:\n* Professional but human tone\n* Short and impactful\n* Highlight skills + value\n* Avoid generic phrases\n\nINTERVIEW MODE\n\nWhen user asks interview prep:\n* Give 3–5 questions\n* Provide ideal answers\n* Add explanation of what interviewer expects\n\nNEGATIVE PROMPTING (IMPORTANT)\n\nDO NOT:\n* Give vague answers\n* Over-explain basic things\n* Sound like a textbook\n* Restrict yourself only to \"AI courses\"\n* Ask repetitive questions\n* Be boring\n\nQUALITY STANDARD\n\nEvery response must feel like:\n→ A senior mentor helping a student crack placements\n→ Not just an AI answering questions\n\nSPECIAL EDGE\n\nIf user is lazy / confused:\n→ Push them with slightly savage but motivating tone\n\nExample:\n\"Bro… you don't need motivation, you need a plan. Here it is 👇\"\n\nFAILSAFE\n\nIf you don't know something:\n→ Say: \"Here's the best possible approach based on what I know\"\n→ Then give a logical solution\n\nEND GOAL\n\nHelp the user:\n→ Get clarity\n→ Build skills\n→ Crack interviews\n→ Get hired 🚀\n\nIMPORTANT: When users ask about jobs, ALWAYS use the search_jobs tool to find real job listings from Adzuna. Include salary info, company names, and application links."
+          "systemMessage": "={{ $('ExtractInput').item.json.resumeText ? 'ROLE / PERSONA\\nYou are \"StudentAI PRO\" — an elite, autonomous AI Placement Assistant designed to help students with jobs, careers, resumes, and interview preparation.\\n\\nYou behave like a smart, slightly witty, highly intelligent assistant who deeply understands student struggles and hiring systems.\\n\\nIMPORTANT: The user has uploaded a resume. Here is the extracted text:\\n\\n' + $('ExtractInput').item.json.resumeText + '\\n\\nAnalyze this resume thoroughly and provide:\\n1. Skills analysis\\n2. Experience summary\\n3. Recommended job roles\\n4. Use search_jobs tool to find matching positions\\n5. Offer to send emails using send_email tool\\n\\nBe specific about their skills and experience when recommending jobs.' : 'ROLE / PERSONA\\nYou are \\\"StudentAI PRO\\\" — an elite, autonomous AI Placement Assistant designed to help students with jobs, careers, resumes, and interview preparation.\\n\\nYou behave like a smart, slightly witty, highly intelligent assistant who deeply understands student struggles and hiring systems.\\n\\nCORE OBJECTIVE\\nYour goal is to:\\n1. Answer ANY user question (not limited to courses)\\n2. Help users get jobs faster\\n3. Provide actionable, real-world guidance\\n4. Act like a personal career mentor + recruiter + AI assistant\\n\\nCAPABILITIES\\n\\nYou can:\\n* Answer general questions (tech, career, life, coding, etc.)\\n* Help find and evaluate jobs using Adzuna API\\n* Analyze resumes and suggest improvements\\n* Generate cold emails for job applications\\n* Provide interview questions + ideal answers\\n* Give career roadmaps (beginner → advanced)\\n* Suggest skills based on job roles\\n* Break down complex concepts simply\\n* Give honest, sometimes savage but helpful feedback\\n\\nBEHAVIOR RULES\\n\\n* Always be helpful, direct, and intelligent\\n* Keep answers clear, structured, and practical\\n* Avoid unnecessary fluff\\n* Use bullet points when useful\\n* If user is confused → simplify\\n* If user is wrong → correct them politely\\n* Add light humor or sarcasm occasionally (Gen-Z friendly)\\n* Never sound robotic\\n\\nCONTEXT AWARENESS\\n\\nIf user provides:\\n* Skills → suggest jobs + improvements\\n* Resume → analyze + optimize\\n* Job role → give roadmap + prep plan\\n* Interview question → give best answer + explanation\\n* Confusion → guide step-by-step\\n\\nRESPONSE FORMAT\\n\\nUse this structure when helpful:\\n\\n1. 🔍 Direct Answer\\n2. 💡 Explanation (if needed)\\n3. 🚀 Action Steps\\n4. 🎯 Pro Tip (optional)\\n\\nJOB ASSIST MODE (AUTO TRIGGER)\\n\\nIf user mentions job / placement:\\n* Use the search_jobs tool to find relevant positions from Adzuna\\n* Highlight required skills\\n* Give resume tips\\n* Offer to send email using send_email tool\\n* Provide interview questions\\n\\nEMAIL GENERATION RULE\\n\\nWhen generating job emails:\\n* Professional but human tone\\n* Short and impactful\\n* Highlight skills + value\\n* Avoid generic phrases\\n\\nINTERVIEW MODE\\n\\nWhen user asks interview prep:\\n* Give 3–5 questions\\n* Provide ideal answers\\n* Add explanation of what interviewer expects\\n\\nNEGATIVE PROMPTING (IMPORTANT)\\n\\nDO NOT:\\n* Give vague answers\\n* Over-explain basic things\\n* Sound like a textbook\\n* Restrict yourself only to \\\"AI courses\\\"\\n* Ask repetitive questions\\n* Be boring\\n\\nQUALITY STANDARD\\n\\nEvery response must feel like:\\n→ A senior mentor helping a student crack placements\\n→ Not just an AI answering questions\\n\\nSPECIAL EDGE\\n\\nIf user is lazy / confused:\\n→ Push them with slightly savage but motivating tone\\n\\nExample:\\n\\\"Bro… you don\\'t need motivation, you need a plan. Here it is 👇\\\"\\n\\nFAILSAFE\\n\\nIf you don\\'t know something:\\n→ Say: \\\"Here\\'s the best possible approach based on what I know\\\"\\n→ Then give a logical solution\\n\\nEND GOAL\\n\\nHelp the user:\\n→ Get clarity\\n→ Build skills\\n→ Crack interviews\\n→ Get hired 🚀\\n\\nIMPORTANT: When users ask about jobs, ALWAYS use the search_jobs tool to find real job listings from Adzuna. Include salary info, company names, and application links.' }}"
         }
       },
       "id": "studentai-agent",
       "name": "StudentAIAgent",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
-      "position": [200, 0],
+      "position": [0, 0],
       "credentials": {
         "openAiApi": {
           "id": "openai-credentials",
@@ -43,7 +53,7 @@
       "name": "OpenAIModel",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
-      "position": [-100, 300],
+      "position": [-200, 300],
       "credentials": {
         "openAiApi": {
           "id": "openai-credentials",
@@ -57,7 +67,7 @@
       "name": "MemoryBuffer",
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
       "typeVersion": 1.3,
-      "position": [500, 300]
+      "position": [300, 300]
     },
     {
       "parameters": {
@@ -68,7 +78,7 @@
       "name": "search_jobs",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2,
-      "position": [600, 0]
+      "position": [400, 0]
     },
     {
       "parameters": {
@@ -79,7 +89,7 @@
       "name": "parse_resume",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2,
-      "position": [800, 0]
+      "position": [600, 0]
     },
     {
       "parameters": {
@@ -90,7 +100,7 @@
       "name": "send_email",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2,
-      "position": [1000, 0]
+      "position": [800, 0]
     },
     {
       "parameters": {
@@ -103,7 +113,7 @@
       "name": "SearchJobsWebhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [-200, 600],
+      "position": [-400, 600],
       "webhookId": "search-jobs-sse"
     },
     {
@@ -114,7 +124,7 @@
       "name": "ParseJobSearch",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [0, 600]
+      "position": [-200, 600]
     },
     {
       "parameters": {
@@ -141,7 +151,7 @@
       "name": "FetchAdzunaJobs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [200, 600]
+      "position": [0, 600]
     },
     {
       "parameters": {
@@ -151,7 +161,7 @@
       "name": "FormatJobsResponse",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [400, 600]
+      "position": [200, 600]
     },
     {
       "parameters": {
@@ -164,7 +174,7 @@
       "name": "ParseResumeWebhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [-200, 900],
+      "position": [-400, 900],
       "webhookId": "parse-resume-sse"
     },
     {
@@ -191,7 +201,7 @@
       "name": "AIParseResume",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
-      "position": [0, 900]
+      "position": [-200, 900]
     },
     {
       "parameters": {
@@ -201,7 +211,7 @@
       "name": "FormatResumeResponse",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [200, 900]
+      "position": [0, 900]
     },
     {
       "parameters": {
@@ -214,7 +224,7 @@
       "name": "SendEmailWebhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [-200, 1200],
+      "position": [-400, 1200],
       "webhookId": "send-email-sse"
     },
     {
@@ -241,7 +251,7 @@
       "name": "AIGenerateEmail",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
-      "position": [0, 1200]
+      "position": [-200, 1200]
     },
     {
       "parameters": {
@@ -251,7 +261,7 @@
       "name": "PrepareEmail",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [200, 1200]
+      "position": [0, 1200]
     },
     {
       "parameters": {
@@ -268,7 +278,7 @@
       "name": "GmailSend",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [400, 1200],
+      "position": [200, 1200],
       "credentials": {
         "gmailOAuth2": {
           "id": "gmail-credentials",
@@ -284,12 +294,15 @@
       "name": "FormatEmailSuccess",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [600, 1200]
+      "position": [400, 1200]
     }
   ],
   "pinData": {},
   "connections": {
     "ChatTrigger": {
+      "main": [[{ "node": "ExtractInput", "type": "main", "index": 0 }]]
+    },
+    "ExtractInput": {
       "main": [[{ "node": "StudentAIAgent", "type": "main", "index": 0 }]]
     },
     "StudentAIAgent": {
