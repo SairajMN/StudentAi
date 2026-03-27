@@ -1,0 +1,348 @@
+{
+  "name": "StudentAI_PRO_Placement",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "mode": "webhook"
+      },
+      "id": "chat-trigger",
+      "name": "ChatTrigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [-400, 0]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "ROLE / PERSONA\nYou are \"StudentAI PRO\" — an elite, autonomous AI Placement Assistant designed to help students with jobs, careers, resumes, and interview preparation.\n\nYou behave like a smart, slightly witty, highly intelligent assistant who deeply understands student struggles and hiring systems.\n\nCORE OBJECTIVE\nYour goal is to:\n1. Answer ANY user question (not limited to courses)\n2. Help users get jobs faster\n3. Provide actionable, real-world guidance\n4. Act like a personal career mentor + recruiter + AI assistant\n\nCAPABILITIES\n\nYou can:\n* Answer general questions (tech, career, life, coding, etc.)\n* Help find and evaluate jobs using Adzuna API\n* Analyze resumes and suggest improvements\n* Generate cold emails for job applications\n* Provide interview questions + ideal answers\n* Give career roadmaps (beginner → advanced)\n* Suggest skills based on job roles\n* Break down complex concepts simply\n* Give honest, sometimes savage but helpful feedback\n\nBEHAVIOR RULES\n\n* Always be helpful, direct, and intelligent\n* Keep answers clear, structured, and practical\n* Avoid unnecessary fluff\n* Use bullet points when useful\n* If user is confused → simplify\n* If user is wrong → correct them politely\n* Add light humor or sarcasm occasionally (Gen-Z friendly)\n* Never sound robotic\n\nCONTEXT AWARENESS\n\nIf user provides:\n* Skills → suggest jobs + improvements\n* Resume → analyze + optimize\n* Job role → give roadmap + prep plan\n* Interview question → give best answer + explanation\n* Confusion → guide step-by-step\n\nRESPONSE FORMAT\n\nUse this structure when helpful:\n\n1. 🔍 Direct Answer\n2. 💡 Explanation (if needed)\n3. 🚀 Action Steps\n4. 🎯 Pro Tip (optional)\n\nJOB ASSIST MODE (AUTO TRIGGER)\n\nIf user mentions job / placement:\n* Use the search_jobs tool to find relevant positions from Adzuna\n* Highlight required skills\n* Give resume tips\n* Offer to send email using send_email tool\n* Provide interview questions\n\nEMAIL GENERATION RULE\n\nWhen generating job emails:\n* Professional but human tone\n* Short and impactful\n* Highlight skills + value\n* Avoid generic phrases\n\nINTERVIEW MODE\n\nWhen user asks interview prep:\n* Give 3–5 questions\n* Provide ideal answers\n* Add explanation of what interviewer expects\n\nNEGATIVE PROMPTING (IMPORTANT)\n\nDO NOT:\n* Give vague answers\n* Over-explain basic things\n* Sound like a textbook\n* Restrict yourself only to \"AI courses\"\n* Ask repetitive questions\n* Be boring\n\nQUALITY STANDARD\n\nEvery response must feel like:\n→ A senior mentor helping a student crack placements\n→ Not just an AI answering questions\n\nSPECIAL EDGE\n\nIf user is lazy / confused:\n→ Push them with slightly savage but motivating tone\n\nExample:\n\"Bro… you don't need motivation, you need a plan. Here it is 👇\"\n\nFAILSAFE\n\nIf you don't know something:\n→ Say: \"Here's the best possible approach based on what I know\"\n→ Then give a logical solution\n\nEND GOAL\n\nHelp the user:\n→ Get clarity\n→ Build skills\n→ Crack interviews\n→ Get hired 🚀\n\nIMPORTANT: When users ask about jobs, ALWAYS use the search_jobs tool to find real job listings from Adzuna. Include salary info, company names, and application links."
+        }
+      },
+      "id": "studentai-agent",
+      "name": "StudentAIAgent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [200, 0],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-credentials",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "id": "openai-model",
+      "name": "OpenAIModel",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [-100, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-credentials",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "memory-buffer",
+      "name": "MemoryBuffer",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "description": "Search for jobs using Adzuna API. Input JSON with: keyword (job title/skills), location (city/country), resultsPerPage (number of results, default 10). Example: {\"keyword\": \"React Developer\", \"location\": \"Bangalore\", \"resultsPerPage\": 10}",
+        "workflowId": "={{ $env.SEARCH_JOBS_WORKFLOW_ID }}"
+      },
+      "id": "search-jobs-tool",
+      "name": "search_jobs",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [600, 0]
+    },
+    {
+      "parameters": {
+        "description": "Parse and analyze resume text. Extract skills, experience, education.",
+        "workflowId": "={{ $env.PARSE_RESUME_WORKFLOW_ID }}"
+      },
+      "id": "parse-resume-tool",
+      "name": "parse_resume",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [800, 0]
+    },
+    {
+      "parameters": {
+        "description": "Generate and send professional email for job applications via Gmail. Input JSON: jobTitle, company, candidateName, candidateEmail, skills, reason. Sends to company and CC sairaj.nadaf@gmail.com",
+        "workflowId": "={{ $env.SEND_EMAIL_WORKFLOW_ID }}"
+      },
+      "id": "send-email-tool",
+      "name": "send_email",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [1000, 0]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "search-jobs-sse",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "search-jobs-webhook",
+      "name": "SearchJobsWebhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-200, 600],
+      "webhookId": "search-jobs-sse"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first()?.json?.body || {};\nconst keyword = body.keyword || body.query || body.search || 'Software Developer';\nconst location = body.location || body.city || 'India';\nconst resultsPerPage = Math.min(body.resultsPerPage || body.limit || 10, 50);\n\nreturn [{\n  json: {\n    keyword,\n    location,\n    resultsPerPage,\n    what: keyword,\n    where: location\n  }\n}];"
+      },
+      "id": "parse-job-search",
+      "name": "ParseJobSearch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 600]
+    },
+    {
+      "parameters": {
+        "url": "https://api.adzuna.com/v1/api/jobs/in/search/1",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "app_id", "value": "={{ $env.ADZUNA_APP_ID }}" },
+            { "name": "app_key", "value": "={{ $env.ADZUNA_APP_KEY }}" },
+            {
+              "name": "results_per_page",
+              "value": "={{ $json.resultsPerPage }}"
+            },
+            { "name": "what", "value": "={{ $json.keyword }}" },
+            { "name": "where", "value": "={{ $json.location }}" },
+            { "name": "content-type", "value": "application/json" },
+            { "name": "sort_by", "value": "relevance" },
+            { "name": "max_days_old", "value": "30" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "fetch-adzuna-jobs",
+      "name": "FetchAdzunaJobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [200, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first()?.json || {};\nconst results = Array.isArray(response.results) ? response.results : [];\n\nif (results.length === 0) {\n  return [{ json: { output: 'No jobs found for this search. Try different keywords or location.', jobs: [] } }];\n}\n\nconst jobs = results.map((job, i) => ({\n  title: job.title || 'Unknown',\n  company: job.company?.display_name || 'Unknown Company',\n  location: job.location?.display_name || 'India',\n  salaryMin: job.salary_min,\n  salaryMax: job.salary_max,\n  salaryIsEstimated: job.salary_is_predicted === '1',\n  description: (job.description || '').substring(0, 300) + '...',\n  applyUrl: job.redirect_url || '',\n  postedDate: job.created || '',\n  category: job.category?.label || '',\n  contractType: job.contract_type || '',\n  contractTime: job.contract_time || ''\n}));\n\nlet output = `🎯 Found ${jobs.length} jobs:\\n\\n`;\njobs.forEach((job, i) => {\n  output += `${i + 1}. **${job.title}** at ${job.company}\\n`;\n  output += `   📍 ${job.location}\\n`;\n  if (job.salaryMin || job.salaryMax) {\n    output += `   💰 ₹${job.salaryMin?.toLocaleString() || '?'} - ₹${job.salaryMax?.toLocaleString() || '?'}${job.salaryIsEstimated ? ' (estimated)' : ''}\\n`;\n  }\n  output += `   📝 ${job.description}\\n`;\n  output += `   🔗 Apply: ${job.applyUrl}\\n\\n`;\n});\n\nreturn [{ json: { output, jobs } }];"
+      },
+      "id": "format-jobs-response",
+      "name": "FormatJobsResponse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 600]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "parse-resume-sse",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "parse-resume-webhook",
+      "name": "ParseResumeWebhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-200, 900],
+      "webhookId": "parse-resume-sse"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.OPENROUTER_API_KEY }}"
+            },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"model\": \"anthropic/claude-3.5-sonnet\",\n  \"temperature\": 0.1,\n  \"max_tokens\": 2048,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Parse this resume and extract: fullName, email, phone, location, skills (array), technicalSkills (array), experience (array with company/role/duration), education (array), certifications (array), summary, yearsOfExperience (number), primaryRole. Return ONLY valid JSON.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{$json.resumeText}}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "ai-parse-resume",
+      "name": "AIParseResume",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [0, 900]
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiResponse = $input.first()?.json || {};\n\nfunction extractContent(raw) {\n  return raw?.choices?.[0]?.message?.content ?? '';\n}\n\nfunction parseJson(content) {\n  try {\n    const cleaned = String(content).replace(/```json/gi, '').replace(/```/g, '').trim();\n    const match = cleaned.match(/\\{[\\s\\S]*\\}/);\n    return JSON.parse(match ? match[0] : cleaned);\n  } catch (e) {\n    return { error: 'Failed to parse resume', skills: [], technicalSkills: [] };\n  }\n}\n\nconst parsed = parseJson(extractContent(aiResponse));\n\nlet output = `✅ **Resume Analysis Complete!**\\n\\n`;\noutput += `👤 **Name:** ${parsed.fullName || 'Not found'}\\n`;\noutput += `📧 **Email:** ${parsed.email || 'Not found'}\\n`;\noutput += `🎯 **Primary Role:** ${parsed.primaryRole || 'Not specified'}\\n`;\noutput += `💼 **Experience:** ${parsed.yearsOfExperience || 0} years\\n\\n`;\noutput += `🔑 **Skills:** ${(parsed.technicalSkills || []).slice(0, 10).join(', ')}\\n\\n`;\noutput += `💡 **Recommendation:** Based on your profile, I recommend searching for '${parsed.primaryRole || 'Software Developer'}' positions. Use the search_jobs tool to find matching opportunities!`;\n\nreturn [{ json: { output, parsed } }];"
+      },
+      "id": "format-resume-response",
+      "name": "FormatResumeResponse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, 900]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-email-sse",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "send-email-webhook",
+      "name": "SendEmailWebhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-200, 1200],
+      "webhookId": "send-email-sse"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.OPENROUTER_API_KEY }}"
+            },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"model\": \"anthropic/claude-3.5-sonnet\",\n  \"temperature\": 0.7,\n  \"max_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Generate a professional job application email. Keep it concise (max 200 words), impactful, and human. Avoid generic phrases. Highlight specific skills and value. Return ONLY the email body text, no subject line.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate email for:\\nJob: {{$json.jobTitle}}\\nCompany: {{$json.company}}\\nCandidate: {{$json.candidateName}}\\nSkills: {{$json.skills}}\\nReason: {{$json.reason}}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "ai-generate-email",
+      "name": "AIGenerateEmail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [0, 1200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiResponse = $input.first()?.json || {};\nconst webhookData = $items('SendEmailWebhook')[0]?.json?.body || {};\n\nfunction extractContent(raw) {\n  return raw?.choices?.[0]?.message?.content ?? 'Failed to generate email';\n}\n\nconst emailBody = extractContent(aiResponse);\nconst jobTitle = webhookData.jobTitle || 'Job Position';\nconst company = webhookData.company || 'Company';\nconst candidateName = webhookData.candidateName || 'Candidate';\n\nreturn [{\n  json: {\n    subject: `Application for ${jobTitle} Position at ${company}`,\n    emailBody,\n    company,\n    jobTitle,\n    candidateName,\n    to: webhookData.to || '',\n    cc: 'sairaj.nadaf@gmail.com'\n  }\n}];"
+      },
+      "id": "prepare-email",
+      "name": "PrepareEmail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, 1200]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "=<div style=\"font-family: Arial, sans-serif; line-height: 1.6;\">{{$json.emailBody.replace(/\\n/g, '<br>')}}</div>",
+        "options": {
+          "ccList": "sairaj.nadaf@gmail.com",
+          "appendAttribution": false
+        }
+      },
+      "id": "gmail-send",
+      "name": "GmailSend",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [400, 1200],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail-credentials",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const emailResult = $input.first()?.json || {};\n\nreturn [{\n  json: {\n    output: `✅ **Email Sent Successfully!**\\n\\n📧 **To:** ${emailResult.to || 'Company'}\\n📋 **Subject:** ${emailResult.subject || 'Job Application'}\\n👤 **CC:** sairaj.nadaf@gmail.com\\n\\nYour application has been sent! Good luck! 🚀`\n  }\n}];"
+      },
+      "id": "format-email-success",
+      "name": "FormatEmailSuccess",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 1200]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "ChatTrigger": {
+      "main": [[{ "node": "StudentAIAgent", "type": "main", "index": 0 }]]
+    },
+    "StudentAIAgent": {
+      "main": [[]]
+    },
+    "OpenAIModel": {
+      "ai_languageModel": [
+        [{ "node": "StudentAIAgent", "type": "ai_languageModel", "index": 0 }]
+      ]
+    },
+    "MemoryBuffer": {
+      "ai_memory": [
+        [{ "node": "StudentAIAgent", "type": "ai_memory", "index": 0 }]
+      ]
+    },
+    "search_jobs": {
+      "ai_tool": [[{ "node": "StudentAIAgent", "type": "ai_tool", "index": 0 }]]
+    },
+    "parse_resume": {
+      "ai_tool": [[{ "node": "StudentAIAgent", "type": "ai_tool", "index": 0 }]]
+    },
+    "send_email": {
+      "ai_tool": [[{ "node": "StudentAIAgent", "type": "ai_tool", "index": 0 }]]
+    },
+    "SearchJobsWebhook": {
+      "main": [[{ "node": "ParseJobSearch", "type": "main", "index": 0 }]]
+    },
+    "ParseJobSearch": {
+      "main": [[{ "node": "FetchAdzunaJobs", "type": "main", "index": 0 }]]
+    },
+    "FetchAdzunaJobs": {
+      "main": [[{ "node": "FormatJobsResponse", "type": "main", "index": 0 }]]
+    },
+    "ParseResumeWebhook": {
+      "main": [[{ "node": "AIParseResume", "type": "main", "index": 0 }]]
+    },
+    "AIParseResume": {
+      "main": [[{ "node": "FormatResumeResponse", "type": "main", "index": 0 }]]
+    },
+    "SendEmailWebhook": {
+      "main": [[{ "node": "AIGenerateEmail", "type": "main", "index": 0 }]]
+    },
+    "AIGenerateEmail": {
+      "main": [[{ "node": "PrepareEmail", "type": "main", "index": 0 }]]
+    },
+    "PrepareEmail": {
+      "main": [[{ "node": "GmailSend", "type": "main", "index": 0 }]]
+    },
+    "GmailSend": {
+      "main": [[{ "node": "FormatEmailSuccess", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "studentai-pro-placement" }
+}

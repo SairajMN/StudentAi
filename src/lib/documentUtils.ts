@@ -151,8 +151,8 @@ export function generatePDF(options: GenerateDocumentOptions): void {
   // Set metadata
   doc.setProperties({
     title,
-    author: author || "StudentAI",
-    creator: "StudentAI Document Generator",
+    author: author || "PlaceAI",
+    creator: "PlaceAI Document Generator",
   });
 
   // Add title
@@ -198,8 +198,8 @@ export async function generateDOCX(
   const doc = new Document({
     properties: {
       title,
-      author: author || "StudentAI",
-      creator: "StudentAI Document Generator",
+      author: author || "PlaceAI",
+      creator: "PlaceAI Document Generator",
     },
     sections: [
       {

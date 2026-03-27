@@ -1,8 +1,8 @@
-# 🎓 StudentAI Placement Agent
+# 🎓 PlaceAI Placement Agent
 
 <div align="center">
 
-![StudentAI Logo](https://img.shields.io/badge/StudentAI-Placement_Agent-blue?style=for-the-badge&logo=robot)
+![PlaceAI Logo](https://img.shields.io/badge/PlaceAI-Placement_Agent-blue?style=for-the-badge&logo=robot)
 ![React](https://img.shields.io/badge/React-18.3-blue?style=flat-square&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue?style=flat-square&logo=typescript)
 ![Vite](https://img.shields.io/badge/Vite-5.4-purple?style=flat-square&logo=vite)
@@ -16,7 +16,7 @@
 
 ---
 
-## 📖 What is StudentAI? (For Beginners!)
+## 📖 What is PlaceAI? (For Beginners!)
 
 Imagine having a **smart robot friend** 🤖 that helps you find jobs! Here's what it does in simple terms:
 
@@ -34,7 +34,7 @@ Imagine having a **smart robot friend** 🤖 that helps you find jobs! Here's wh
 
 ```mermaid
 mindmap
-  root((StudentAI))
+  root((PlaceAI))
     📄 Resume Upload
       PDF Support
       DOCX Support
@@ -301,7 +301,7 @@ graph LR
 ## 📁 Project Structure
 
 ```
-studentai/
+PlaceAI/
 ├── 📄 index.html              # Main HTML file
 ├── 📄 package.json            # Project dependencies
 ├── 📄 vite.config.ts          # Vite configuration
@@ -358,10 +358,10 @@ Before you start, make sure you have these installed:
 
 ```bash
 # Clone the project
-git clone https://github.com/SairajMN/StudentAi.git
+git clone https://github.com/SairajMN/PlaceAI.git
 
 # Go into the project folder
-cd StudentAi
+cd PlaceAI
 ```
 
 ### Step 2: Install Dependencies
@@ -610,6 +610,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Built with ❤️ for students looking for their dream jobs**
 
-[⬆ Back to Top](#-studentai-placement-agent)
+[⬆ Back to Top](#-PlaceAI-placement-agent)
 
 </div>

@@ -18,25 +18,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { message, chatHistory } = req.body;
+    const { chatInput, sessionId, history, resumeText, fileName } = req.body;
 
-    const response = await fetch(
-      "https://rtyui.app.n8n.cloud/webhook/e73ca48e-e2da-4724-8484-917e902af575/chat",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ message, chatHistory }),
+    const webhookUrl =
+      "https://rtyui.app.n8n.cloud/webhook/3babe261-ee55-46b6-b2c9-2d6c918b939c/chat";
+
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    );
+      body: JSON.stringify({
+        chatInput: chatInput || "",
+        sessionId: sessionId || "anonymous",
+        history: history || [],
+        resumeText: resumeText || "",
+        fileName: fileName || "",
+      }),
+    });
 
     if (!response.ok) {
-      throw new Error(`n8n responded with status: ${response.status}`);
+      throw new Error(`Webhook error: ${response.status}`);
     }
 
     const data = await response.json();
-    return res.status(200).json(data);
+
+    // n8n chat webhooks usually return { output: "..." } or similar
+    const output =
+      data.output ||
+      data.response ||
+      data.text ||
+      (typeof data === "string"
+        ? data
+        : "I received a response but couldn't parse the message content.");
+
+    return res.status(200).json({ output, data });
   } catch (error) {
     console.error("Proxy error:", error);
     return res.status(500).json({

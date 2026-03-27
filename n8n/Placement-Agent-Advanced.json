@@ -1,0 +1,381 @@
+{
+  "name": "Placement Agent Advanced - Resume to Jobs",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "placement-advanced",
+        "responseMode": "lastNode",
+        "options": {
+          "binaryPropertyName": "resume"
+        }
+      },
+      "id": "webhook-trigger-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-1200, 300],
+      "webhookId": "placement-advanced-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract resume text from binary or body\nconst body = $input.first()?.json?.body || {};\nconst binaryData = $input.first()?.binary?.resume;\n\nlet resumeText = body.resumeText || body.text || '';\nlet fileName = body.fileName || 'resume.pdf';\nlet candidateEmail = body.email || body.candidateEmail || '';\nlet candidateName = body.name || body.candidateName || body.fullName || '';\nlet location = body.location || body.city || 'India';\n\nconst hasBinary = !!binaryData;\n\nreturn [\n  {\n    json: {\n      resumeText,\n      fileName,\n      candidateEmail,\n      candidateName,\n      location,\n      hasBinary,\n      mimeType: binaryData?.mimeType || 'unknown',\n      fileSize: binaryData?.fileSize || 0,\n      timestamp: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "id": "parse-input-001",
+      "name": "Parse Input Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-960, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.OPENROUTER_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "HTTP-Referer",
+              "value": "https://n8n.io"
+            },
+            {
+              "name": "X-Title",
+              "value": "Placement Agent - Resume Parser"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"model\": \"anthropic/claude-3.5-sonnet\",\n  \"temperature\": 0.1,\n  \"max_tokens\": 2048,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an expert resume parser. Extract structured data from resumes with HIGH ACCURACY. Return ONLY valid JSON, no markdown, no explanation.\\n\\nRequired JSON format:\\n{\\n  \\\"fullName\\\": \\\"extracted name\\\",\\n  \\\"email\\\": \\\"extracted email\\\",\\n  \\\"phone\\\": \\\"extracted phone\\\",\\n  \\\"location\\\": \\\"city, country\\\",\\n  \\\"skills\\\": [\\\"skill1\\\", \\\"skill2\\\", ...],\\n  \\\"experience\\\": [{\\n    \\\"company\\\": \\\"company name\\\",\\n    \\\"role\\\": \\\"job title\\\",\\n    \\\"duration\\\": \\\"duration\\\",\\n    \\\"description\\\": \\\"brief description\\\"\\n  }],\\n  \\\"education\\\": [{\\n    \\\"institution\\\": \\\"university name\\\",\\n    \\\"degree\\\": \\\"degree type\\\",\\n    \\\"field\\\": \\\"field of study\\\",\\n    \\\"year\\\": \\\"graduation year\\\"\\n  }],\\n  \\\"certifications\\\": [\\\"cert1\\\", \\\"cert2\\\"],\\n  \\\"summary\\\": \\\"brief professional summary\\\",\\n  \\\"yearsOfExperience\\\": 0,\\n  \\\"primaryRole\\\": \\\"most recent or target role\\\",\\n  \\\"industryKeywords\\\": [\\\"keyword1\\\", \\\"keyword2\\\"],\\n  \\\"technicalSkills\\\": [\\\"tech1\\\", \\\"tech2\\\"],\\n  \\\"softSkills\\\": [\\\"skill1\\\", \\\"skill2\\\"]\\n}\\n\\nBe thorough. Extract ALL skills mentioned. Include programming languages, frameworks, tools, methodologies.\\nFor skills, be SPECIFIC: 'React.js' not just 'JavaScript frameworks'.\\nFor primaryRole, identify the MOST SUITABLE role based on experience and skills.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Parse this resume and extract all information:\\n\\nCandidate Name (if provided): {{$json.candidateName}}\\nCandidate Email (if provided): {{$json.candidateEmail}}\\nLocation (if provided): {{$json.location}}\\n\\nResume Text:\\n{{$json.resumeText}}\\n\\nExtract ALL information accurately. If name/email were provided, use them unless the resume has different info.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "ai-resume-parser-001",
+      "name": "AI Resume Parser",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-720, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiResponse = $input.first()?.json || {};\nconst inputData = $items('Parse Input Data')[0]?.json || {};\n\nfunction extractContent(raw) {\n  return raw?.choices?.[0]?.message?.content\n    ?? raw?.data?.choices?.[0]?.message?.content\n    ?? raw?.response?.choices?.[0]?.message?.content\n    ?? '';\n}\n\nfunction parseModelJson(content) {\n  try {\n    const cleaned = String(content || '').replace(/```json/gi, '').replace(/```/g, '').trim();\n    const match = cleaned.match(/\\{[\\s\\S]*\\}/);\n    const candidate = match ? match[0] : cleaned;\n    return JSON.parse(candidate);\n  } catch (e) {\n    return null;\n  }\n}\n\nconst content = extractContent(aiResponse);\nconst parsed = parseModelJson(content);\n\nif (!parsed) {\n  return [{ json: { error: true, message: 'Failed to parse resume. Please ensure the resume text is clear and readable.', rawContent: content.substring(0, 500) } }];\n}\n\nconst result = {\n  error: false,\n  fullName: parsed.fullName || inputData.candidateName || 'Candidate',\n  email: parsed.email || inputData.candidateEmail || '',\n  phone: parsed.phone || '',\n  location: parsed.location || inputData.location || 'India',\n  skills: Array.isArray(parsed.skills) ? parsed.skills : [],\n  technicalSkills: Array.isArray(parsed.technicalSkills) ? parsed.technicalSkills : [],\n  softSkills: Array.isArray(parsed.softSkills) ? parsed.softSkills : [],\n  experience: Array.isArray(parsed.experience) ? parsed.experience : [],\n  education: Array.isArray(parsed.education) ? parsed.education : [],\n  certifications: Array.isArray(parsed.certifications) ? parsed.certifications : [],\n  summary: parsed.summary || '',\n  yearsOfExperience: Number(parsed.yearsOfExperience) || 0,\n  primaryRole: parsed.primaryRole || 'Software Developer',\n  industryKeywords: Array.isArray(parsed.industryKeywords) ? parsed.industryKeywords : [],\n  fileName: inputData.fileName || 'resume.pdf',\n  parsedAt: new Date().toISOString()\n};\n\nresult.allSkills = [...new Set([...result.skills, ...result.technicalSkills, ...result.industryKeywords])];\n\nreturn [{ json: result }];"
+      },
+      "id": "extract-resume-data-001",
+      "name": "Extract Resume Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.error === true }}",
+              "operation": "isTrue"
+            }
+          ]
+        }
+      },
+      "id": "check-parse-error-001",
+      "name": "Check Parse Error",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [-240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.OPENROUTER_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "HTTP-Referer",
+              "value": "https://n8n.io"
+            },
+            {
+              "name": "X-Title",
+              "value": "Placement Agent - Keyword Generator"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"model\": \"anthropic/claude-3.5-sonnet\",\n  \"temperature\": 0.2,\n  \"max_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a STRICT job search keyword generator for the Adzuna job API.\\n\\nYour task: Generate OPTIMAL search keywords that will return the MOST RELEVANT job listings.\\n\\nRULES (BE STRICT):\\n1. Keywords must be SPECIFIC job titles, NOT generic terms\\n2. Use industry-standard job titles that companies actually post\\n3. Prioritize keywords by relevance to candidate's strongest skills\\n4. Maximum 3 keyword sets for multiple searches\\n5. Each keyword should be 2-4 words maximum\\n6. Include both specific and slightly broader options\\n\\nReturn ONLY valid JSON:\\n{\\n  \\\"primaryKeyword\\\": \\\"most specific job title\\\",\\n  \\\"secondaryKeyword\\\": \\\"alternative job title\\\",\\n  \\\"tertiaryKeyword\\\": \\\"broader job title\\\",\\n  \\\"searchStrategy\\\": \\\"brief explanation of keyword choices\\\",\\n  \\\"skillBasedKeywords\\\": [\\\"keyword1\\\", \\\"keyword2\\\", \\\"keyword3\\\"]\\n}\\n\\nExamples:\\n- React + Node.js developer -> 'Frontend Developer', 'Full Stack Developer', 'React Developer'\\n- Data Science + Python -> 'Data Scientist', 'Machine Learning Engineer', 'Data Analyst'\\n- Java + Spring -> 'Java Developer', 'Backend Developer', 'Software Engineer'\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate STRICT job search keywords for this candidate:\\n\\nPrimary Role: {{$json.primaryRole}}\\nAll Skills: {{$json.allSkills.join(', ')}}\\nTechnical Skills: {{$json.technicalSkills.join(', ')}}\\nYears of Experience: {{$json.yearsOfExperience}}\\nLocation: {{$json.location}}\\nIndustry Keywords: {{$json.industryKeywords.join(', ')}}\\n\\nGenerate keywords that will find the BEST matching jobs on Adzuna. Be SPECIFIC to their skillset.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "generate-keywords-001",
+      "name": "Generate Strict Keywords",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resumeData = $items('Extract Resume Data')[0]?.json || {};\nconst keywordResponse = $input.first()?.json || {};\n\nfunction extractContent(raw) {\n  return raw?.choices?.[0]?.message?.content ?? raw?.data?.choices?.[0]?.message?.content ?? raw?.response?.choices?.[0]?.message?.content ?? '';\n}\n\nfunction parseModelJson(content) {\n  try {\n    const cleaned = String(content || '').replace(/```json/gi, '').replace(/```/g, '').trim();\n    const match = cleaned.match(/\\{[\\s\\S]*\\}/);\n    return JSON.parse(match ? match[0] : cleaned);\n  } catch (e) {\n    return null;\n  }\n}\n\nconst content = extractContent(keywordResponse);\nconst keywords = parseModelJson(content);\n\nif (!keywords) {\n  const fallbackKeywords = {\n    primaryKeyword: resumeData.primaryRole || 'Software Developer',\n    secondaryKeyword: resumeData.technicalSkills?.[0] || 'Developer',\n    tertiaryKeyword: 'Software Engineer',\n    searchStrategy: 'Using fallback keywords based on primary role',\n    skillBasedKeywords: resumeData.allSkills?.slice(0, 3) || ['Developer']\n  };\n  return [{ json: { ...resumeData, keywords: fallbackKeywords } }];\n}\n\nreturn [{ json: { ...resumeData, keywords: { primaryKeyword: keywords.primaryKeyword || resumeData.primaryRole, secondaryKeyword: keywords.secondaryKeyword || '', tertiaryKeyword: keywords.tertiaryKeyword || '', searchStrategy: keywords.searchStrategy || '', skillBasedKeywords: Array.isArray(keywords.skillBasedKeywords) ? keywords.skillBasedKeywords : [] } } }];"
+      },
+      "id": "merge-keywords-001",
+      "name": "Merge Keywords with Profile",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nconst keywords = data.keywords || {};\nconst searches = [];\n\nif (keywords.primaryKeyword) searches.push({ json: { ...data, searchQuery: keywords.primaryKeyword, searchType: 'primary', searchIndex: 0 } });\nif (keywords.secondaryKeyword) searches.push({ json: { ...data, searchQuery: keywords.secondaryKeyword, searchType: 'secondary', searchIndex: 1 } });\nif (keywords.tertiaryKeyword) searches.push({ json: { ...data, searchQuery: keywords.tertiaryKeyword, searchType: 'tertiary', searchIndex: 2 } });\n\nif (searches.length === 0) searches.push({ json: { ...data, searchQuery: data.primaryRole || 'Software Developer', searchType: 'fallback', searchIndex: 0 } });\n\nreturn searches;"
+      },
+      "id": "create-search-queries-001",
+      "name": "Create Search Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.ADZUNA_BASE_URL || 'https://api.adzuna.com/v1/api/jobs/in/search/1' }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "app_id", "value": "={{ $env.ADZUNA_APP_ID }}" },
+            { "name": "app_key", "value": "={{ $env.ADZUNA_APP_KEY }}" },
+            { "name": "results_per_page", "value": "20" },
+            { "name": "what", "value": "={{ $json.searchQuery }}" },
+            { "name": "where", "value": "={{ $json.location || 'India' }}" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "fetch-adzuna-001",
+      "name": "Fetch Jobs from Adzuna",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const adzunaResponse = $input.first()?.json || {};\nconst searchData = $items('Create Search Queries')[$itemIndex]?.json || {};\nconst results = Array.isArray(adzunaResponse.results) ? adzunaResponse.results : [];\n\nif (results.length === 0) return [{ json: { ...searchData, jobs: [], jobsFound: 0, searchType: searchData.searchType } }];\n\nconst normalizedJobs = results.map((job, index) => ({\n  id: `adzuna_${searchData.searchType}_${index}`,\n  title: job.title || 'Unknown Role',\n  company: job.company?.display_name || 'Unknown Company',\n  location: job.location?.display_name || searchData.location || 'India',\n  description: job.description || '',\n  applyUrl: job.redirect_url || '',\n  salaryMin: job.salary_min ?? null,\n  salaryMax: job.salary_max ?? null,\n  salaryIsEstimated: job.salary_is_predicted === '1',\n  publishedAt: job.created || '',\n  category: job.category?.label || '',\n  contractType: job.contract_type || '',\n  contractTime: job.contract_time || '',\n  source: 'Adzuna',\n  searchType: searchData.searchType,\n  searchQuery: searchData.searchQuery\n}));\n\nreturn [{ json: { ...searchData, jobs: normalizedJobs, jobsFound: normalizedJobs.length } }];"
+      },
+      "id": "normalize-jobs-001",
+      "name": "Normalize Jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\nconst resumeData = $items('Merge Keywords with Profile')[0]?.json || {};\nlet allJobs = [];\nlet totalFound = 0;\n\nfor (const item of allItems) {\n  const data = item.json || {};\n  if (Array.isArray(data.jobs)) { allJobs = allJobs.concat(data.jobs); totalFound += data.jobsFound || 0; }\n}\n\nconst seen = new Set();\nconst uniqueJobs = allJobs.filter(job => {\n  const key = `${job.company?.toLowerCase()}_${job.title?.toLowerCase()}`;\n  if (seen.has(key)) return false;\n  seen.add(key);\n  return true;\n});\n\nconst jobsToScore = uniqueJobs.slice(0, 30);\n\nreturn jobsToScore.map(job => ({ json: { ...resumeData, jobTitle: job.title, company: job.company, jobLocation: job.location, jobDescription: job.description, applyUrl: job.applyUrl, salaryMin: job.salaryMin, salaryMax: job.salaryMax, salaryIsEstimated: job.salaryIsEstimated, publishedAt: job.publishedAt, category: job.category, contractType: job.contractType, contractTime: job.contractTime, source: job.source, searchType: job.searchType, jobId: job.id, totalJobsFound: totalFound, uniqueJobsFound: uniqueJobs.length } }));"
+      },
+      "id": "combine-deduplicate-001",
+      "name": "Combine and Deduplicate Jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.OPENROUTER_API_KEY }}"
+            },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "HTTP-Referer", "value": "https://n8n.io" },
+            { "name": "X-Title", "value": "Placement Agent - Job Scorer" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"model\": \"anthropic/claude-3.5-sonnet\",\n  \"temperature\": 0.1,\n  \"max_tokens\": 512,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a STRICT job-candidate matching scorer. Return ONLY valid JSON, no markdown.\\n\\nScoring Criteria (0-10):\\n- Skills match (40%): How well do candidate skills align with job requirements?\\n- Role match (30%): Does the job title match candidate's target/experience?\\n- Experience match (20%): Does experience level fit?\\n- Location match (10%): Is location compatible?\\n\\nReturn EXACTLY this format:\\n{\\\"score\\\": 0-10, \\\"reason\\\": \\\"brief 1-line reason\\\", \\\"skillsMatch\\\": [\\\"matched skill1\\\"], \\\"skillsGap\\\": [\\\"missing skill1\\\"], \\\"fitLevel\\\": \\\"excellent|good|fair|poor\\\"}\\n\\nBe STRICT. Score 7+ only for STRONG matches. Score 5-6 for decent matches. Below 5 for weak matches.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Score this job match:\\n\\nCANDIDATE:\\n- Name: {{$json.fullName}}\\n- Primary Role: {{$json.primaryRole}}\\n- Skills: {{$json.allSkills.join(', ')}}\\n- Technical Skills: {{$json.technicalSkills.join(', ')}}\\n- Experience: {{$json.yearsOfExperience}} years\\n- Location: {{$json.location}}\\n\\nJOB:\\n- Title: {{$json.jobTitle}}\\n- Company: {{$json.company}}\\n- Location: {{$json.jobLocation}}\\n- Description: {{$json.jobDescription.substring(0, 800)}}\\n\\nScore this job match STRICTLY. Return JSON only.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "score-jobs-001",
+      "name": "Score Each Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1440, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const scoredItems = $input.all();\nconst jobItems = $items('Combine and Deduplicate Jobs');\nconst resumeData = $items('Merge Keywords with Profile')[0]?.json || {};\nconst threshold = 5;\n\nfunction extractContent(raw) { return raw?.choices?.[0]?.message?.content ?? raw?.data?.choices?.[0]?.message?.content ?? raw?.response?.choices?.[0]?.message?.content ?? ''; }\n\nfunction parseModelJson(content) {\n  try {\n    const cleaned = String(content || '').replace(/```json/gi, '').replace(/```/g, '').trim();\n    const match = cleaned.match(/\\{[\\s\\S]*\\}/);\n    return JSON.parse(match ? match[0] : cleaned);\n  } catch (e) { return { score: 0, reason: 'Parse error', skillsMatch: [], skillsGap: [], fitLevel: 'poor' }; }\n}\n\nconst matches = [];\nfor (let i = 0; i < scoredItems.length; i++) {\n  const raw = scoredItems[i].json || {};\n  const job = jobItems[i]?.json || {};\n  const parsed = parseModelJson(extractContent(raw));\n  const score = Math.max(0, Math.min(10, Number(parsed.score) || 0));\n  if (score < threshold) continue;\n  matches.push({ jobTitle: job.jobTitle, company: job.company, jobLocation: job.jobLocation, jobDescription: job.jobDescription, applyUrl: job.applyUrl, salaryMin: job.salaryMin, salaryMax: job.salaryMax, salaryIsEstimated: job.salaryIsEstimated, publishedAt: job.publishedAt, category: job.category, contractType: job.contractType, contractTime: job.contractTime, source: job.source, score, reason: parsed.reason || '', skillsMatch: Array.isArray(parsed.skillsMatch) ? parsed.skillsMatch : [], skillsGap: Array.isArray(parsed.skillsGap) ? parsed.skillsGap : [], fitLevel: parsed.fitLevel || 'fair' });\n}\n\nmatches.sort((a, b) => b.score - a.score);\nconst topMatches = matches.slice(0, 8);\n\nreturn [{ json: { ...resumeData, allScoredJobs: matches, topJobs: topMatches, totalScored: scoredItems.length, totalMatched: matches.length, topJobsCount: topMatches.length, timestamp: new Date().toISOString() } }];"
+      },
+      "id": "aggregate-scores-001",
+      "name": "Aggregate and Rank Jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.OPENROUTER_API_KEY }}"
+            },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "HTTP-Referer", "value": "https://n8n.io" },
+            { "name": "X-Title", "value": "Placement Agent - Career Guidance" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"model\": \"anthropic/claude-3.5-sonnet\",\n  \"temperature\": 0.7,\n  \"max_tokens\": 2048,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an expert AI Placement Agent and Career Counselor. Provide personalized, actionable career guidance based on the candidate's profile and matched jobs. Be encouraging but realistic. Format response in clean markdown.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Provide comprehensive career guidance for this candidate:\\n\\nCANDIDATE PROFILE:\\n- Name: {{$json.fullName}}\\n- Primary Role: {{$json.primaryRole}}\\n- Skills: {{$json.allSkills.join(', ')}}\\n- Experience: {{$json.yearsOfExperience}} years\\n- Location: {{$json.location}}\\n- Summary: {{$json.summary}}\\n\\nTOP MATCHED JOBS ({{$json.topJobsCount}} found):\\n{{ $json.topJobs.map((j, i) => (i+1) + '. ' + j.jobTitle + ' at ' + j.company + ' (Score: ' + j.score + '/10 - ' + j.fitLevel + ')').join('\\\\n') }}\\n\\nProvide:\\n1. **Profile Assessment**: Strengths and market positioning\\n2. **Skill Gap Analysis**: Key skills to develop for better matches\\n3. **Top 3 Recommendations**: Best job matches with reasoning\\n4. **Application Strategy**: How to stand out for these roles\\n5. **Interview Focus**: Key areas to prepare\\n6. **Career Growth Path**: Suggested next steps\\n\\nKeep it concise, actionable, and encouraging.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "career-guidance-001",
+      "name": "Generate Career Guidance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1920, 480]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rankedJobs = $items('Aggregate and Rank Jobs')[0]?.json || {};\nconst guidanceResponse = $input.first()?.json || {};\n\nfunction extractContent(raw) { return raw?.choices?.[0]?.message?.content ?? raw?.data?.choices?.[0]?.message?.content ?? raw?.response?.choices?.[0]?.message?.content ?? ''; }\n\nconst careerGuidance = extractContent(guidanceResponse);\n\nconst emailDrafts = rankedJobs.topJobs?.map((job, index) => {\n  const subject = `Application for ${job.jobTitle} Position at ${job.company}`;\n  const body = [\n    `Dear ${job.company} Hiring Team,`,\n    '',\n    `I am writing to express my strong interest in the ${job.jobTitle} position at ${job.company}.`,\n    '',\n    `With ${rankedJobs.yearsOfExperience || 'relevant'} years of experience in ${rankedJobs.primaryRole || 'software development'}, I believe I would be a valuable addition to your team.`,\n    '',\n    `Key qualifications that align with this role:`,\n    ...job.skillsMatch.map(s => `• ${s}`),\n    '',\n    `My technical expertise includes: ${rankedJobs.technicalSkills?.slice(0, 5).join(', ') || rankedJobs.allSkills?.slice(0, 5).join(', ')}`,\n    '',\n    `I am particularly drawn to this opportunity because: ${job.reason}`,\n    '',\n    `I have attached my resume for your review and would welcome the opportunity to discuss how my skills and experience can contribute to ${job.company}'s continued success.`,\n    '',\n    'Thank you for your consideration.',\n    '',\n    'Best regards,',\n    rankedJobs.fullName || 'Candidate'\n  ].join('\\n');\n\n  return { to: '', subject, body, company: job.company, jobTitle: job.jobTitle, applyUrl: job.applyUrl, score: job.score, fitLevel: job.fitLevel };\n}) || [];\n\nreturn [{ json: { status: 'success', candidateName: rankedJobs.fullName, candidateEmail: rankedJobs.email, candidatePhone: rankedJobs.phone, candidateLocation: rankedJobs.location, primaryRole: rankedJobs.primaryRole, skills: rankedJobs.allSkills, technicalSkills: rankedJobs.technicalSkills, yearsOfExperience: rankedJobs.yearsOfExperience, keywords: rankedJobs.keywords, totalJobsFound: rankedJobs.totalJobsFound || 0, uniqueJobsFound: rankedJobs.uniqueJobsFound || 0, totalScored: rankedJobs.totalScored || 0, totalMatched: rankedJobs.totalMatched || 0, topJobs: rankedJobs.topJobs || [], allScoredJobs: rankedJobs.allScoredJobs || [], emailDrafts, careerGuidance: careerGuidance || 'Career guidance not available', timestamp: new Date().toISOString() } }];"
+      },
+      "id": "build-final-response-001",
+      "name": "Build Final Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2160, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nreturn [{ json: { status: 'error', message: data.message || 'Failed to parse resume. Please upload a clear resume file or paste the resume text.', error: true, timestamp: new Date().toISOString() } }];"
+      },
+      "id": "error-response-001",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "options": {}
+      },
+      "id": "respond-webhook-001",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2400, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $items('Build Final Response')[0]?.json || {};\nlet output = '';\n\nif (data.error) {\n  output = `❌ ${data.message}`;\n} else {\n  output = `✅ **Resume Analysis Complete!**\\n\\n`;\n  output += `👤 **Candidate:** ${data.candidateName}\\n`;\n  output += `🎯 **Target Role:** ${data.primaryRole}\\n`;\n  output += `📍 **Location:** ${data.candidateLocation}\\n`;\n  output += `💼 **Experience:** ${data.yearsOfExperience} years\\n\\n`;\n  output += `🔑 **Your Skills:** ${data.skills?.slice(0, 10).join(', ')}${data.skills?.length > 10 ? '...' : ''}\\n\\n`;\n  output += `🔍 **Search Keywords Used:**\\n`;\n  output += `• Primary: ${data.keywords?.primaryKeyword}\\n`;\n  if (data.keywords?.secondaryKeyword) output += `• Secondary: ${data.keywords?.secondaryKeyword}\\n`;\n  if (data.keywords?.tertiaryKeyword) output += `• Tertiary: ${data.keywords?.tertiaryKeyword}\\n`;\n  output += `\\n📊 **Results:** Found ${data.uniqueJobsFound} unique jobs, scored ${data.totalScored}, matched ${data.totalMatched}\\n\\n`;\n  if (data.topJobs?.length > 0) {\n    output += `🏆 **TOP ${data.topJobs.length} MATCHING JOBS:**\\n\\n`;\n    data.topJobs.forEach((job, i) => {\n      output += `**${i + 1}. ${job.jobTitle}** at ${job.company}\\n`;\n      output += `   📍 ${job.jobLocation}\\n`;\n      if (job.salaryMin || job.salaryMax) output += `   💰 ₹${job.salaryMin?.toLocaleString() || '?'} - ₹${job.salaryMax?.toLocaleString() || '?'}${job.salaryIsEstimated ? ' (estimated)' : ''}\\n`;\n      output += `   ⭐ Score: ${job.score}/10 (${job.fitLevel})\\n`;\n      output += `   📝 ${job.reason}\\n`;\n      if (job.skillsMatch?.length > 0) output += `   ✅ Matching: ${job.skillsMatch.join(', ')}\\n`;\n      if (job.skillsGap?.length > 0) output += `   📚 Skills to learn: ${job.skillsGap.join(', ')}\\n`;\n      output += `   🔗 Apply: ${job.applyUrl}\\n\\n`;\n    });\n  } else {\n    output += `⚠️ No strong matches found. Consider broadening your search or developing additional skills.\\n\\n`;\n  }\n  output += `📧 **Email drafts prepared for top ${data.emailDrafts?.length || 0} companies**\\n\\n`;\n  output += `💡 **Career Guidance:**\\n${data.careerGuidance}`;\n}\n\nreturn [{ json: { response: output, data: data } }];"
+      },
+      "id": "format-chat-output-001",
+      "name": "Format Chat Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2160, 520]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{ "node": "Parse Input Data", "type": "main", "index": 0 }]]
+    },
+    "Parse Input Data": {
+      "main": [[{ "node": "AI Resume Parser", "type": "main", "index": 0 }]]
+    },
+    "AI Resume Parser": {
+      "main": [[{ "node": "Extract Resume Data", "type": "main", "index": 0 }]]
+    },
+    "Extract Resume Data": {
+      "main": [[{ "node": "Check Parse Error", "type": "main", "index": 0 }]]
+    },
+    "Check Parse Error": {
+      "main": [
+        [{ "node": "Error Response", "type": "main", "index": 0 }],
+        [{ "node": "Generate Strict Keywords", "type": "main", "index": 0 }]
+      ]
+    },
+    "Error Response": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    },
+    "Generate Strict Keywords": {
+      "main": [
+        [{ "node": "Merge Keywords with Profile", "type": "main", "index": 0 }]
+      ]
+    },
+    "Merge Keywords with Profile": {
+      "main": [
+        [{ "node": "Create Search Queries", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Search Queries": {
+      "main": [
+        [{ "node": "Fetch Jobs from Adzuna", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Jobs from Adzuna": {
+      "main": [[{ "node": "Normalize Jobs", "type": "main", "index": 0 }]]
+    },
+    "Normalize Jobs": {
+      "main": [
+        [{ "node": "Combine and Deduplicate Jobs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Combine and Deduplicate Jobs": {
+      "main": [[{ "node": "Score Each Job", "type": "main", "index": 0 }]]
+    },
+    "Score Each Job": {
+      "main": [
+        [{ "node": "Aggregate and Rank Jobs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Aggregate and Rank Jobs": {
+      "main": [
+        [
+          { "node": "Generate Career Guidance", "type": "main", "index": 0 },
+          { "node": "Build Final Response", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Generate Career Guidance": {
+      "main": [[{ "node": "Build Final Response", "type": "main", "index": 0 }]]
+    },
+    "Build Final Response": {
+      "main": [
+        [
+          { "node": "Format Chat Output", "type": "main", "index": 0 },
+          { "node": "Respond to Webhook", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Format Chat Output": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1", "binaryMode": "separate" },
+  "meta": { "instanceId": "placement-agent-advanced" }
+}

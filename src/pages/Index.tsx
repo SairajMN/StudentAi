@@ -5,6 +5,7 @@ import HeroSection from "@/components/HeroSection";
 import Dashboard from "@/components/Dashboard";
 import JobResults from "@/components/JobResults";
 import ActivityLog from "@/components/ActivityLog";
+import AnimatedBackground from "@/components/AnimatedBackground";
 import { JobMatch } from "@/lib/api";
 
 const views = ["hero", "dashboard", "results", "activity"] as const;
@@ -42,19 +43,22 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar currentView={currentView} onNavigate={setCurrentView} />
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentView}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.25 }}
-        >
-          {renderView()}
-        </motion.div>
-      </AnimatePresence>
+    <div className="min-h-screen bg-background relative">
+      <AnimatedBackground />
+      <div className="relative z-10">
+        <Navbar currentView={currentView} onNavigate={setCurrentView} />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentView}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.25 }}
+          >
+            {renderView()}
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </div>
   );
 };
