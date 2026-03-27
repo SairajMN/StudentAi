@@ -16,6 +16,12 @@ export default defineConfig(({ mode }) => ({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/n8n/, ""),
       },
+      "/api/chat": {
+        target:
+          "https://rtyui.app.n8n.cloud/webhook/3babe261-ee55-46b6-b2c9-2d6c918b939c/chat",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/chat/, ""),
+      },
     },
   },
   plugins: [react()],
